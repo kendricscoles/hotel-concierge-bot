@@ -4,3 +4,4 @@ langchain-community>=0.2
 python-dotenv>=1.0
 langsmith>=0.1
 langfuse>=2.40.0
+langchain-cerebras>=0.0.3
