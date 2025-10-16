@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-load_dotenv()  # only used when running locally
 
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss-120b")  
