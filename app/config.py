@@ -1,17 +1,21 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-possible_env_paths = [
-    Path(__file__).resolve().parents[1] / ".env",
-    Path("/work/hotel-concierge-bot/.env"),
-    Path("/datasets/_deepnote_work/hotel-concierge-bot/.env"),
-]
+env_file = find_dotenv(filename=".env", usecwd=True)
+if not env_file:
+    candidates = [
+        Path(__file__).resolve().parents[1] / ".env",
+        Path("/work/hotel-concierge-bot/.env"),
+        Path("/datasets/_deepnote_work/hotel-concierge-bot/.env"),
+    ]
+    for p in candidates:
+        if p.exists():
+            env_file = str(p)
+            break
 
-for env_path in possible_env_paths:
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
-        break
+if env_file:
+    load_dotenv(env_file, override=True)
 
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss-120b")
