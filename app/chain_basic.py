@@ -14,7 +14,6 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 llm = ChatCerebras(model=MODEL_NAME, temperature=0.2)
-
 chain = prompt | llm | StrOutputParser()
 
 def ask_once(text: str) -> str:
