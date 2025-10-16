@@ -1,2 +1,2 @@
 # hotel-concierge-bot
-Hotel COncierge Chatbot using Langchain &amp; Cerebras
+Hotel Concierge Chatbot using Langchain &amp; Cerebras
