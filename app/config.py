@@ -2,13 +2,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 
-"""
-Configuration loader for the Hotel Concierge Bot project.
-This file loads environment variables (Cerebras, Langfuse, etc.)
-from a .env file no matter where the project is run
-(Deepnote, local machine, or GitHub Codespaces).
-"""
-
 env_file = find_dotenv(filename=".env", usecwd=True)
 
 if not env_file:
@@ -29,20 +22,12 @@ else:
     print("No .env file found. Please create one with your API keys.")
 
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # harmless if unused
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss-120b")
 
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
-
-if not CEREBRAS_API_KEY:
-    print("CEREBRAS_API_KEY not loaded.")
-if not MODEL_NAME:
-    print("MODEL_NAME missing or None.")
-if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
-    print("Langfuse tracing enabled.")
-else:
-    print("Langfuse tracing disabled or incomplete keys.")
 
 def show_config_summary():
     print("\nCONFIG SUMMARY")
