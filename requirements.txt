@@ -8,3 +8,5 @@ langsmith>=0.1
 langfuse>=2.40.0
 pypdf
 beautifulsoup4
+requests
+pandas
