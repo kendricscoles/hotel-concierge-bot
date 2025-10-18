@@ -10,3 +10,14 @@ pypdf
 beautifulsoup4
 requests
 pandas
+langchain>=0.2.12
+langchain-community>=0.2.12
+langchain-openai>=0.1.7
+sentence-transformers>=3.0.0
+faiss-cpu>=1.8.0
+pypdf>=4.2.0
+beautifulsoup4
+lxml
+requests
+tiktoken
+pandas
