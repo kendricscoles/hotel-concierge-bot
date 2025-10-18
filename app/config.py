@@ -22,7 +22,7 @@ else:
     print("No .env file found. Please create one with your API keys.")
 
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # harmless if unused
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-oss-120b")
 
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
