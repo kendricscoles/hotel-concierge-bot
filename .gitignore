@@ -84,3 +84,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+.ipynb_checkpoints/
+.DS_Store
+__pycache__/
+.env
+data/**/raw/**
+*.zip
+*.7z
