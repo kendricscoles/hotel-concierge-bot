@@ -29,9 +29,8 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{user_input}")
 ])
 
-# Cerebras via OpenAI-compatible endpoint
 llm = ChatOpenAI(
-    model=MODEL_NAME,                 # e.g., "gpt-oss-120b"
+    model=gpt-oss-120b,
     api_key=CEREBRAS_API_KEY,
     base_url="https://api.cerebras.ai/v1",
     temperature=0.2,
