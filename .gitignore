@@ -93,3 +93,5 @@ data/**/raw/**
 *.7z
 .env
 .idea/
+.env
+.idea/
