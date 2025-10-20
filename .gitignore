@@ -95,3 +95,5 @@ data/**/raw/**
 .idea/
 .env
 .idea/
+.env
+.idea/
