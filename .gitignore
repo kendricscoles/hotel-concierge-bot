@@ -91,3 +91,5 @@ __pycache__/
 data/**/raw/**
 *.zip
 *.7z
+.env
+.idea/
