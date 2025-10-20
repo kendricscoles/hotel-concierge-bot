@@ -3,9 +3,9 @@ from typing import List, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
 from langsmith import traceable
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, PyMuPDFLoader, BSHTMLLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from openai import OpenAI
 
@@ -85,7 +85,9 @@ def _persisted_vs():
         _vs_persisted = FAISS.from_texts([""], _emb())
         _vs_persisted.save_local(INDEX_DIR)
         return _vs_persisted
-    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, separators=["\n\n", "\n", " ", ""])
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, separators=["\n\n", "\n", " ", ""]
+    )
     chunks = splitter.split_documents(base_docs)
     _vs_persisted = FAISS.from_documents(chunks, _emb())
     _vs_persisted.save_local(INDEX_DIR)
