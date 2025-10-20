@@ -1,17 +1,13 @@
-import os, pathlib, warnings, time
-from typing import List, Tuple
-from pathlib import Path
+import os, pathlib, warnings
+from typing import List, Tuple, Optional
 from dotenv import load_dotenv
-from langsmith import traceable
-from langchain_community.document_loaders import PyPDFLoader, PyMuPDFLoader, BSHTMLLoader, TextLoader
+from langchain_community.document_loaders import PyPDFLoader, BSHTMLLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from openai import OpenAI
 
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(dotenv_path=ROOT / ".env")
-
+load_dotenv()
 warnings.filterwarnings("ignore")
 os.environ.setdefault("USER_AGENT", os.getenv("USER_AGENT", "hotel-concierge-bot/1.0"))
 
@@ -20,7 +16,7 @@ CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 CEREBRAS_API_BASE = os.getenv("CEREBRAS_API_BASE", "https://api.cerebras.ai/v1")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", CEREBRAS_API_BASE)
-
+ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA_DIR = str(ROOT / "data")
 INDEX_DIR = str(ROOT / "index")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
@@ -28,10 +24,7 @@ CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "700"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "120"))
 TOP_K_DEFAULT = int(os.getenv("TOP_K", "4"))
 
-_client = None
-_embeddings = None
-_vs_persisted = None
-
+_client: Optional[OpenAI] = None
 def _client_openai() -> OpenAI:
     global _client
     if _client is not None:
@@ -40,10 +33,10 @@ def _client_openai() -> OpenAI:
     base_url = OPENAI_BASE_URL or CEREBRAS_API_BASE
     if not api_key:
         raise RuntimeError("No API key set.")
-    _client = OpenAI(api_key=api_key, base_url=base_url, timeout=120)
+    _client = OpenAI(api_key=api_key, base_url=base_url)
     return _client
 
-def _load_dir_documents(dir_path: str):
+def _load_dir_documents(dir_path: str) -> List:
     docs = []
     p = pathlib.Path(dir_path)
     if not p.exists():
@@ -52,10 +45,7 @@ def _load_dir_documents(dir_path: str):
         sfx = f.suffix.lower()
         try:
             if sfx == ".pdf":
-                try:
-                    docs += PyMuPDFLoader(str(f)).load()
-                except Exception:
-                    docs += PyPDFLoader(str(f)).load()
+                docs += PyPDFLoader(str(f)).load()
             elif sfx in {".html", ".htm"}:
                 docs += BSHTMLLoader(str(f)).load()
             elif sfx in {".txt", ".md", ".markdown"}:
@@ -63,6 +53,9 @@ def _load_dir_documents(dir_path: str):
         except Exception:
             pass
     return docs
+
+_embeddings = None
+_vs_persisted = None
 
 def _emb():
     global _embeddings
@@ -91,22 +84,67 @@ def _persisted_vs():
     _vs_persisted.save_local(INDEX_DIR)
     return _vs_persisted
 
+def _temp_vs_from_uploads(paths: List[str]):
+    docs = []
+    for p in (paths or []):
+        f = pathlib.Path(p)
+        if not f.exists():
+            continue
+        try:
+            if f.suffix.lower() == ".pdf":
+                docs += PyPDFLoader(str(f)).load()
+            elif f.suffix.lower() in {".html", ".htm"}:
+                docs += BSHTMLLoader(str(f)).load()
+            elif f.suffix.lower() in {".txt", ".md", ".markdown"}:
+                docs += TextLoader(str(f), encoding="utf-8").load()
+        except Exception:
+            pass
+    if not docs:
+        return None
+    splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
+    chunks = splitter.split_documents(docs)
+    return FAISS.from_documents(chunks, _emb())
+
+def retrieve(query: str, k: int = TOP_K_DEFAULT, uploaded_paths: Optional[List[str]] = None) -> List[Tuple[str, dict]]:
+    q = (query or "").strip()
+    if not q:
+        return []
+    base_vs = _persisted_vs()
+    base_hits = base_vs.similarity_search(q, k=k)
+    if uploaded_paths:
+        tmp_vs = _temp_vs_from_uploads(uploaded_paths)
+        if tmp_vs is not None:
+            tmp_hits = tmp_vs.similarity_search(q, k=k)
+            merged = []
+            for a, b in zip(base_hits, tmp_hits):
+                merged.extend([a, b])
+            longer = base_hits if len(base_hits) > len(tmp_hits) else tmp_hits
+            merged.extend(longer[len(merged)//2:])
+            hits = merged[:k]
+        else:
+            hits = base_hits
+    else:
+        hits = base_hits
+    return [(d.page_content, d.metadata) for d in hits]
+
 SYSTEM_PROMPT = (
     "Du bist ein präziser, freundlicher Hotel-Concierge in Basel. Antworte knapp, sachlich und hilfreich. "
-    "Nutze den gegebenen Kontext für Fakten. Wenn dir im Kontext etwas fehlt, antworte trotzdem so gut wie möglich "
-    "und kennzeichne allgemeine Hinweise mit allgemein."
+    "Nutze nur den gegebenen Kontext für Fakten. Wenn dir im Kontext etwas fehlt, sag das explizit und antworte "
+    "ggf. mit allgemeinen Hinweisen, markiert als allgemein. Zitiere Quellen als [S1], [S2], ..."
 )
 
 def _format_context(chunks: List[Tuple[str, dict]]) -> str:
     lines = []
-    for (text, meta) in chunks:
+    for i, (text, meta) in enumerate(chunks, start=1):
+        src = meta.get("source") or meta.get("file_path") or meta.get("source_id") or "unknown"
+        page = meta.get("page", None)
+        label = f"{src}" + (f":p{page}" if page is not None else "")
         snippet = (text or "").strip().replace("\n", " ")
         if len(snippet) > 900:
             snippet = snippet[:900] + " ..."
-        lines.append(snippet)
+        lines.append(f"[S{i}] {label}\n{snippet}")
     return "\n\n".join(lines)
 
-@traceable(name="chat_call")
 def _chat(prompt: str, temperature: float = 0.2, max_tokens: int = 700) -> str:
     client = _client_openai()
     r = client.chat.completions.create(
@@ -117,41 +155,21 @@ def _chat(prompt: str, temperature: float = 0.2, max_tokens: int = 700) -> str:
     )
     return (r.choices[0].message.content or "").strip()
 
-@traceable(name="retrieve")
-def retrieve(query: str, k: int = TOP_K_DEFAULT):
+def answer_with_llm(query: str, k: int = TOP_K_DEFAULT, uploaded_paths: Optional[List[str]] = None) -> Tuple[str, str]:
     q = (query or "").strip()
     if not q:
-        return []
-    base_vs = _persisted_vs()
-    try:
-        return [(d.page_content, d.metadata) for d in base_vs.similarity_search(q, k=k)]
-    except Exception:
-        time.sleep(0.5)
-        base_vs = _persisted_vs()
-        return [(d.page_content, d.metadata) for d in base_vs.similarity_search(q, k=k)]
-
-@traceable(name="answer_with_llm")
-def answer_with_llm(query: str, k: int = TOP_K_DEFAULT) -> str:
-    q = (query or "").strip()
-    if not q:
-        return "Bitte stelle eine Frage."
-    chunks = retrieve(q, k=k)
+        return "Bitte stelle eine Frage.", ""
+    chunks = retrieve(q, k=k, uploaded_paths=uploaded_paths)
     if chunks:
         ctx = _format_context(chunks)
-        prompt = f"Frage:\n{q}\n\nKontext:\n{ctx}\n\nHinweise:\n- Antworte auf Deutsch.\n- Antworte nur basierend auf dem Kontext."
-        return _chat(prompt)
+        prompt = f"Frage:\n{q}\n\nKontext:\n{ctx}\n\nHinweise:\n- Antworte auf Deutsch.\n- Zitiere [S1], [S2], ..."
+        ans = _chat(prompt)
+        srcs = []
+        for i, (_, meta) in enumerate(chunks, start=1):
+            src = meta.get("source") or meta.get("file_path") or "unknown"
+            page = meta.get("page", "")
+            tag = f"[S{i}]"
+            srcs.append(f"{tag} {pathlib.Path(src).name}{(':'+str(page)) if page!='' else ''}")
+        return ans, "; ".join(srcs)
     prompt = f"Frage (ohne lokale Quellen):\n{q}\n\nAntworte kurz auf Deutsch. Markiere allgemeine Hinweise mit allgemein."
-    return _chat(prompt)
-
-def debug_list_sources():
-    base_vs = _persisted_vs()
-    try:
-        index_info = base_vs.index.ntotal
-    except Exception:
-        index_info = None
-    docs = _load_dir_documents(DATA_DIR)
-    names = []
-    for d in docs:
-        m = getattr(d, "metadata", {}) or {}
-        names.append(m.get("source") or m.get("file_path") or "unknown")
-    return {"faiss_ntotal": index_info, "loaded_docs": sorted(set(pathlib.Path(n).name for n in names))}
+    return _chat(prompt), "(keine lokalen Quellen)"
