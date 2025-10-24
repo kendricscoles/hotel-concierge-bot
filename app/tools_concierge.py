@@ -2,22 +2,39 @@ import requests
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from langchain.tools import tool
-from langchain_community.tools import DuckDuckGoSearchResults
-from langchain_community.utilities import WikipediaAPIWrapper
 
-_ddg = DuckDuckGoSearchResults(num_results=5)
-_wiki = WikipediaAPIWrapper(lang="en")
+try:
+    from langchain_community.tools import DuckDuckGoSearchResults
+except Exception:
+    DuckDuckGoSearchResults = None
+
+try:
+    from langchain_community.utilities import WikipediaAPIWrapper
+except Exception:
+    WikipediaAPIWrapper = None
 
 class CityInput(BaseModel):
     city_name: str = Field(..., description="City name")
 
 @tool
 def web_search(query: str) -> str:
-    return _ddg.run(query)
+    try:
+        if DuckDuckGoSearchResults is None:
+            return "DuckDuckGo search unavailable: install duckduckgo-search"
+        ddg = DuckDuckGoSearchResults(num_results=5)
+        return ddg.run(query)
+    except Exception as e:
+        return f"DuckDuckGo search error: {e}"
 
 @tool
 def wiki_search(query: str) -> str:
-    return _wiki.run(query)
+    try:
+        if WikipediaAPIWrapper is None:
+            return "Wikipedia unavailable: install wikipedia"
+        wiki = WikipediaAPIWrapper(lang="en")
+        return wiki.run(query)
+    except Exception as e:
+        return f"Wikipedia error: {e}"
 
 @tool(args_schema=CityInput)
 def current_weather(city_name: str) -> str:
