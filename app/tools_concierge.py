@@ -16,7 +16,7 @@ except Exception:
 class CityInput(BaseModel):
     city_name: str = Field(..., description="City name")
 
-@tool
+@tool(description="General web search via DuckDuckGo")
 def web_search(query: str) -> str:
     try:
         if DuckDuckGoSearchResults is None:
@@ -26,7 +26,7 @@ def web_search(query: str) -> str:
     except Exception as e:
         return f"DuckDuckGo search error: {e}"
 
-@tool
+@tool(description="Retrieve concise encyclopedic info from Wikipedia")
 def wiki_search(query: str) -> str:
     try:
         if WikipediaAPIWrapper is None:
@@ -36,7 +36,7 @@ def wiki_search(query: str) -> str:
     except Exception as e:
         return f"Wikipedia error: {e}"
 
-@tool(args_schema=CityInput)
+@tool(args_schema=CityInput, description="Get the current temperature in a city using Open-Meteo")
 def current_weather(city_name: str) -> str:
     try:
         geo = requests.get(
@@ -71,7 +71,7 @@ class CurrencyInput(BaseModel):
     from_code: str = Field(..., description="ISO currency code, e.g., CHF")
     to_code: str = Field(..., description="ISO currency code, e.g., EUR")
 
-@tool(args_schema=CurrencyInput)
+@tool(args_schema=CurrencyInput, description="Convert currencies via exchangerate.host")
 def fx_convert(amount: float, from_code: str, to_code: str) -> str:
     try:
         r = requests.get(
